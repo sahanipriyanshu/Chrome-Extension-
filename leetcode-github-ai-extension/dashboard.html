@@ -4,79 +4,194 @@
   <meta charset="UTF-8">
   <title>LeetCode Sync Dashboard</title>
   <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background: #0f172a;
       color: #e2e8f0;
-      margin: 0;
-      padding: 20px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: flex-start;
       min-height: 100vh;
-      box-sizing: border-box;
     }
-    .container {
-      width: 100%;
-      max-width: 500px;
-      margin: 0 auto;
+
+    /* ── Top Nav Bar ── */
+    .navbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #1e293b;
+      padding: 14px 20px;
+      border-bottom: 1px solid #334155;
     }
-    h2 { font-size: 1.2rem; color: #6366f1; margin: 20px 0 10px 0; }
-    h2:first-child { margin-top: 0; }
+    .navbar h1 {
+      font-size: 1rem;
+      color: #6366f1;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+    }
+    .navbar button {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #94a3b8;
+      font-size: 1.3rem;
+      padding: 4px 8px;
+      border-radius: 6px;
+      transition: background 0.2s;
+    }
+    .navbar button:hover { background: #334155; color: #e2e8f0; }
+
+    /* ── Views ── */
+    .view { display: none; padding: 20px; max-width: 520px; margin: 0 auto; }
+    .view.active { display: block; }
+
+    /* ── Home View ── */
+    .empty-state {
+      text-align: center;
+      color: #475569;
+      margin-top: 40px;
+      font-size: 0.9rem;
+    }
+    .empty-state span { font-size: 2.5rem; display: block; margin-bottom: 10px; }
+
+    .problem-card {
+      background: #1e293b;
+      border-left: 3px solid #6366f1;
+      border-radius: 8px;
+      padding: 12px 14px;
+      margin-bottom: 12px;
+    }
+    .problem-card h3 { font-size: 0.95rem; margin-bottom: 4px; }
+    .problem-card p { font-size: 0.8rem; color: #cbd5e1; margin-bottom: 4px; }
+    .problem-card small { color: #64748b; font-size: 0.75rem; }
+
+    /* ── Settings View ── */
+    .back-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: none;
+      border: none;
+      color: #94a3b8;
+      cursor: pointer;
+      font-size: 0.85rem;
+      margin-bottom: 18px;
+      padding: 0;
+    }
+    .back-btn:hover { color: #e2e8f0; }
+
+    .settings-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #6366f1;
+      margin-bottom: 18px;
+    }
+
     .card {
       background: #1e293b;
-      padding: 12px;
-      border-radius: 8px;
-      margin-bottom: 12px;
+      padding: 16px;
+      border-radius: 10px;
       border: 1px solid #334155;
     }
-    label { display: block; font-size: 0.8rem; margin-bottom: 4px; color: #94a3b8; }
-    input, button {
+
+    label {
+      display: block;
+      font-size: 0.78rem;
+      margin-bottom: 4px;
+      color: #94a3b8;
+      margin-top: 10px;
+    }
+    label:first-child { margin-top: 0; }
+
+    input[type="text"],
+    input[type="password"] {
       width: 100%;
-      padding: 8px;
-      border-radius: 4px;
+      padding: 9px 12px;
+      border-radius: 6px;
       border: 1px solid #334155;
       background: #0f172a;
       color: white;
-      box-sizing: border-box;
-      margin-bottom: 8px;
+      font-size: 0.85rem;
+      margin-bottom: 2px;
     }
-    button {
-      background: #6366f1;
+    input:focus { outline: none; border-color: #6366f1; }
+
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 12px 0;
+    }
+    .checkbox-row input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; }
+    .checkbox-row span { font-size: 0.85rem; color: #cbd5e1; }
+
+    .save-btn {
+      width: 100%;
+      padding: 10px;
+      border-radius: 8px;
       border: none;
-      font-weight: bold;
+      background: #6366f1;
+      color: white;
+      font-weight: 700;
+      font-size: 0.95rem;
       cursor: pointer;
+      margin-top: 14px;
+      transition: background 0.2s;
     }
-    button:hover { background: #4f46e5; }
-    .problem-card {
-      border-left: 3px solid #6366f1;
-      padding-left: 10px;
-      margin-bottom: 15px;
+    .save-btn:hover { background: #4f46e5; }
+
+    /* ── Toast inside dashboard ── */
+    .toast {
+      display: none;
+      background: #16a34a;
+      color: #fff;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 14px;
+      text-align: center;
     }
-    .problem-card h3 { font-size: 0.95rem; margin: 0; }
-    .problem-card p { font-size: 0.8rem; color: #cbd5e1; }
-    .problem-card small { color: #64748b; }
+    .toast.show { display: block; }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h2>Settings</h2>
+
+  <!-- Nav Bar -->
+  <div class="navbar">
+    <h1>🚀 LeetCode GitHub Sync</h1>
+    <button id="go-settings" title="Settings">⚙️</button>
+  </div>
+
+  <!-- HOME VIEW -->
+  <div class="view active" id="view-home">
+    <div class="toast" id="home-toast">✅ Settings saved!</div>
+    <div id="list"></div>
+    <div class="empty-state" id="empty-msg" style="display:none">
+      <span>📭</span>
+      No solved problems yet.<br>Submit an accepted solution on LeetCode!
+    </div>
+  </div>
+
+  <!-- SETTINGS VIEW -->
+  <div class="view" id="view-settings">
+    <button class="back-btn" id="go-home">← Back</button>
+    <div class="settings-title">Settings</div>
     <div class="card">
       <label>GitHub Token</label>
-      <input type="password" id="token" placeholder="ghp_xxx">
+      <input type="password" id="token" placeholder="ghp_xxxxxxxxxxxx">
+
       <label>GitHub Repo (user/repo)</label>
       <input type="text" id="repo" placeholder="sahanipriyanshu/leetcode-solutions">
+
       <label>Gemini API Key</label>
       <input type="password" id="openai" placeholder="AIza...">
-      <label style="display: flex; align-items: center; gap: 8px;">
-        <input type="checkbox" id="sync" style="width: auto; margin: 0;"> Enable Sync
-      </label>
-      <button id="save">Save Settings</button>
-    </div>
 
-    <h2>Solved Problems</h2>
-    <div id="list"></div>
+      <div class="checkbox-row">
+        <input type="checkbox" id="sync">
+        <span>Enable Sync</span>
+      </div>
+
+      <button class="save-btn" id="save">Save Settings</button>
+    </div>
   </div>
 
   <script type="module" src="dashboard.js"></script>

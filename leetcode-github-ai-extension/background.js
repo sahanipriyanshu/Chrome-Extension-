@@ -45,7 +45,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return;
       }
 
-      // 1. Generate AI Explanation
+      // 1. Generate AI Explanation (requires Gemini API key)
       const apiKey = settings[OPENAI_API_KEY];
       if (!apiKey) {
         throw new Error('Gemini API Key is missing. Configure it in the dashboard.');
