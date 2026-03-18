@@ -23,7 +23,8 @@
     {
       "matches": [
         "https://leetcode.com/problems/*",
-        "https://leetcode.com/submissions/*"
+        "https://leetcode.com/submissions/*",
+        "https://leetcode.com/submissions/detail/*"
       ],
       "js": ["content.js"],
       "run_at": "document_idle"

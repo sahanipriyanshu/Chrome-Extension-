@@ -1,6 +1,7 @@
 console.log('LeetCode Sync content script loaded on:', window.location.href);
 
 let lastSubmittedId = null; // Prevent duplicate sends
+let lastSubmitTime = 0;   // Timestamp guard (5s cooldown)
 
 function getLanguage() {
   // Try multiple selectors LeetCode uses for the language picker
@@ -38,21 +39,29 @@ function getCode() {
 }
 
 function extractAndSend() {
-  // Check for accepted result element
-  const resultEl =
+  // Check for accepted result — try known selectors first
+  let resultEl =
     document.querySelector('[data-e2e-locator="submission-result"]') ||
-    document.querySelector('[data-cy="submission-result"]') ||
-    // New LeetCode UI: look for green "Accepted" text
-    Array.from(document.querySelectorAll('span, div')).find(
-      el => el.innerText?.trim() === 'Accepted' &&
-            getComputedStyle(el).color.includes('0, 175') // greenish
+    document.querySelector('[data-cy="submission-result"]');
+
+  // Fallback: find any element whose VISIBLE text is exactly "Accepted"
+  if (!resultEl) {
+    resultEl = Array.from(document.querySelectorAll('span, div, p')).find(
+      el => el.children.length === 0 && el.innerText?.trim() === 'Accepted'
     );
+  }
 
-  if (!resultEl || !resultEl.innerText.includes('Accepted')) return;
+  if (!resultEl) return;
 
-  // Dedup: use current URL as submission key
-  const submissionKey = window.location.href;
-  if (lastSubmittedId === submissionKey) return;
+  const resultText = resultEl.innerText?.trim() || '';
+  if (!resultText.includes('Accepted')) return;
+
+  // Dedup: 5-second cooldown to avoid double-firing on DOM re-renders
+  const now = Date.now();
+  if (now - lastSubmitTime < 5000) return;
+  lastSubmitTime = now;
+
+  const submissionKey = window.location.pathname + '@' + now;
   lastSubmittedId = submissionKey;
 
   const title = getProblemTitle();
