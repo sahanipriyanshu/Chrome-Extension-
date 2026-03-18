@@ -14,9 +14,7 @@
     "https://api.github.com/*",
     "https://generativelanguage.googleapis.com/*"
   ],
-  "action": {
-    "default_popup": "dashboard.html"
-  },
+  "action": {},
   "background": {
     "service_worker": "background.js",
     "type": "module"

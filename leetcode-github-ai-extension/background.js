@@ -2,6 +2,20 @@ import { pushToGitHub } from './github.js';
 import { generateAI } from './ai.js';
 import { saveProblem, GITHUB_TOKEN_KEY, GITHUB_REPO_KEY, SYNC_ENABLED_KEY } from './storage.js';
 
+// Open dashboard as a full tab (stays open when switching tabs)
+chrome.action.onClicked.addListener(async () => {
+  const dashboardUrl = chrome.runtime.getURL('dashboard.html');
+  const existingTabs = await chrome.tabs.query({ url: dashboardUrl });
+  if (existingTabs.length > 0) {
+    // Focus the existing dashboard tab
+    await chrome.tabs.update(existingTabs[0].id, { active: true });
+    await chrome.windows.update(existingTabs[0].windowId, { focused: true });
+  } else {
+    // Open a new tab
+    chrome.tabs.create({ url: dashboardUrl });
+  }
+});
+
 chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
   if (message.type === 'LEETCODE_SUBMISSION') {
     const problem = message.data;
