@@ -95,16 +95,16 @@ function extractAndSend() {
   const resultText = resultEl.innerText?.trim() || '';
   if (!resultText.includes('Accepted')) return;
 
-  // Dedup: use sessionStorage so it survives extension reloads on the same tab
-  const submissionKey = window.location.pathname + '_' + resultText;
-  if (sessionStorage.getItem('lc_last_submit') === submissionKey) return;
-  sessionStorage.setItem('lc_last_submit', submissionKey);
-  // Also enforce a 5s in-memory guard
+  // Dedup: store last push TIME per problem title in sessionStorage
+  // This survives extension reloads and LeetCode SPA URL changes
+  const title = getProblemTitle();
+  const dedupKey = 'lc_push_' + title.replace(/\s+/g, '_');
+  const lastPush = parseInt(sessionStorage.getItem(dedupKey) || '0', 10);
   const now = Date.now();
-  if (now - lastSubmitTime < 5000) return;
+  if (now - lastPush < 60000) return;  // block same problem within 60s
+  sessionStorage.setItem(dedupKey, String(now));
   lastSubmitTime = now;
 
-  const title = getProblemTitle();
   const code = getCode();
   const language = getLanguage();
   const problemId = window.location.pathname.split('/')[2];
