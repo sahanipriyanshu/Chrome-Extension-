@@ -5,14 +5,21 @@
   <title>LeetCode Sync Dashboard</title>
   <style>
     body {
-      width: 350px;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background: #0f172a;
       color: #e2e8f0;
       margin: 0;
-      padding: 15px;
+      padding: 20px;
+      display: flex;
+      justify-content: center;
+      min-height: 100vh;
     }
-    h2 { font-size: 1.2rem; color: #6366f1; margin-top: 0; }
+    .container {
+      width: 100%;
+      max-width: 450px;
+    }
+    h2 { font-size: 1.2rem; color: #6366f1; margin: 20px 0 10px 0; }
+    h2:first-child { margin-top: 0; }
     .card {
       background: #1e293b;
       padding: 12px;
@@ -49,22 +56,24 @@
   </style>
 </head>
 <body>
-  <h2>Settings</h2>
-  <div class="card">
-    <label>GitHub Token</label>
-    <input type="password" id="token" placeholder="ghp_xxx">
-    <label>GitHub Repo (user/repo)</label>
-    <input type="text" id="repo" placeholder="sahanipriyanshu/Test-Repo-">
-    <label>OpenAI API Key</label>
-    <input type="password" id="openai" placeholder="sk-...">
-    <label style="display: flex; align-items: center; gap: 8px;">
-      <input type="checkbox" id="sync" style="width: auto; margin: 0;"> Enable Sync
-    </label>
-    <button id="save">Save Settings</button>
-  </div>
+  <div class="container">
+    <h2>Settings</h2>
+    <div class="card">
+      <label>GitHub Token</label>
+      <input type="password" id="token" placeholder="ghp_xxx">
+      <label>GitHub Repo (user/repo)</label>
+      <input type="text" id="repo" placeholder="sahanipriyanshu/Test-Repo-">
+      <label>OpenAI API Key</label>
+      <input type="password" id="openai" placeholder="sk-...">
+      <label style="display: flex; align-items: center; gap: 8px;">
+        <input type="checkbox" id="sync" style="width: auto; margin: 0;"> Enable Sync
+      </label>
+      <button id="save">Save Settings</button>
+    </div>
 
-  <h2>Solved Problems</h2>
-  <div id="list"></div>
+    <h2>Solved Problems</h2>
+    <div id="list"></div>
+  </div>
 
   <script type="module" src="dashboard.js"></script>
 </body>
