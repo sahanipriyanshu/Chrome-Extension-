@@ -30,6 +30,12 @@ Return JSON ONLY:
   });
 
   const data = await res.json();
+
+  if (!data.candidates || data.candidates.length === 0) {
+    const errMsg = data.error?.message || 'No candidates returned from Gemini API';
+    throw new Error(errMsg);
+  }
+
   let content = data.candidates[0].content.parts[0].text;
 
   // Cleanup markdown if present
