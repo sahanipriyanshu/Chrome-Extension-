@@ -20,7 +20,7 @@ async function load() {
 
   // Simple Settings UI implementation
   document.getElementById('token').value = data[GITHUB_TOKEN_KEY] || '';
-  document.getElementById('repo').value = data[GITHUB_REPO_KEY] || 'sahanipriyanshu/Test-Repo-';
+  document.getElementById('repo').value = data[GITHUB_REPO_KEY] || 'sahanipriyanshu/leetcode-solutions';
   document.getElementById('openai').value = data[OPENAI_API_KEY] || '';
   document.getElementById('sync').checked = data[SYNC_ENABLED_KEY] ?? true;
 }
