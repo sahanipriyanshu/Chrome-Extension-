@@ -146,6 +146,8 @@ function sendToBackground(title) {
           }
         } else if (response?.ok) {
           showToast(`✅ "${title}" pushed to GitHub!`, '#16a34a');
+        } else if (response?.reason === 'already_submitted') {
+          showToast(`🔁 "${title}" was already pushed before!`, '#d97706');
         } else {
           showToast('⚠️ ' + (response?.reason || response?.error || 'Sync failed'), '#d97706');
         }

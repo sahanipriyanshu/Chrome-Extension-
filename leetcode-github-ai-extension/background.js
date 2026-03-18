@@ -44,6 +44,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return;
       }
 
+      // ── Duplicate check ──────────────────────────────────────────────────
+      const localData = await chrome.storage.local.get('problems');
+      const savedProblems = localData.problems || [];
+      const alreadySaved = savedProblems.some(p => p.problemId === problem.problemId);
+      if (alreadySaved) {
+        console.log('⚠️ Already submitted before:', problem.title);
+        sendResponse({ ok: false, reason: 'already_submitted' });
+        return;
+      }
+      // ─────────────────────────────────────────────────────────────────────
+
       // 1. Try AI generation (optional — won't block save/push if it fails)
       let aiResponse = { explanation: 'No AI explanation (API key missing or invalid).', commit: `Add ${problem.title}` };
       const apiKey = settings[OPENAI_API_KEY];
