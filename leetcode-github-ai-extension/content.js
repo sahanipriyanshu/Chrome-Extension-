@@ -1,41 +1,86 @@
-// Constants for LeetCode selectors (may need updates if LeetCode UI changes)
-const SUCCESS_SELECTOR = '[data-e2e-locator="submission-result"]';
-const PROBLEM_TITLE_SELECTOR = 'span.text-label-1.font-medium';
-const CODE_SELECTOR = '.monaco-editor .view-lines'; // Rough selector, extraction might need more care
+console.log('LeetCode Sync content script loaded on:', window.location.href);
 
-function extractSolution() {
-  const resultElement = document.querySelector(SUCCESS_SELECTOR);
-  if (resultElement && resultElement.innerText.includes('Accepted')) {
-    console.log('Submission accepted! Extracting data...');
+let lastSubmittedId = null; // Prevent duplicate sends
 
-    const title = document.querySelector(PROBLEM_TITLE_SELECTOR)?.innerText || 'unknown-problem';
-    const problemId = window.location.pathname.split('/')[2];
-    
-    // LeetCode's code editor is complex. A simple window.view-lines doesn't work well.
-    // Usually, we'd need to scrape the text or use a more robust way. 
-    // For now, let's assume we can find the code in a common container or via copy button hack.
-    const codeLines = Array.from(document.querySelectorAll('.view-line')).map(line => line.innerText).join('\n');
-
-    chrome.runtime.sendMessage({
-      type: 'LEETCODE_SUBMISSION',
-      data: {
-        title: title,
-        problemId: problemId,
-        code: codeLines,
-        language: document.querySelector('.ant-select-selection-selected-value')?.title || 'js'
-      }
-    });
-  }
+function getLanguage() {
+  // Try multiple selectors LeetCode uses for the language picker
+  const sel =
+    document.querySelector('[data-cy="lang-select"] .ant-select-selection-item')?.innerText ||
+    document.querySelector('.ant-select-selection-item')?.innerText ||
+    document.querySelector('[class*="LanguageSelector"] button')?.innerText ||
+    'unknown';
+  return sel.trim();
 }
 
-// Observe for result changes
-const observer = new MutationObserver((mutations) => {
-  for (const mutation of mutations) {
-    if (mutation.addedNodes.length) {
-      extractSolution();
-    }
+function getProblemTitle() {
+  // Try multiple title selectors
+  return (
+    document.querySelector('a[href*="/problems/"] .mr-2')?.innerText ||
+    document.querySelector('div[data-cy="question-title"]')?.innerText ||
+    document.querySelector('span[data-cy="question-title"]')?.innerText ||
+    document.querySelector('.text-title-large a')?.innerText ||
+    document.title.replace(' - LeetCode', '').trim() ||
+    window.location.pathname.split('/')[2]?.replace(/-/g, ' ') ||
+    'Unknown Problem'
+  );
+}
+
+function getCode() {
+  // Get visible code from Monaco editor lines
+  const lines = Array.from(document.querySelectorAll('.view-lines .view-line'));
+  if (lines.length > 0) {
+    return lines.map(l => l.innerText).join('\n');
   }
+  // Fallback: CodeMirror
+  const cm = document.querySelector('.CodeMirror');
+  if (cm && cm.CodeMirror) return cm.CodeMirror.getValue();
+  return '';
+}
+
+function extractAndSend() {
+  // Check for accepted result element
+  const resultEl =
+    document.querySelector('[data-e2e-locator="submission-result"]') ||
+    document.querySelector('[data-cy="submission-result"]') ||
+    // New LeetCode UI: look for green "Accepted" text
+    Array.from(document.querySelectorAll('span, div')).find(
+      el => el.innerText?.trim() === 'Accepted' &&
+            getComputedStyle(el).color.includes('0, 175') // greenish
+    );
+
+  if (!resultEl || !resultEl.innerText.includes('Accepted')) return;
+
+  // Dedup: use current URL as submission key
+  const submissionKey = window.location.href;
+  if (lastSubmittedId === submissionKey) return;
+  lastSubmittedId = submissionKey;
+
+  const title = getProblemTitle();
+  const code = getCode();
+  const language = getLanguage();
+  const problemId = window.location.pathname.split('/')[2];
+
+  console.log('✅ Accepted submission detected:', title);
+  console.log('Code length:', code.length);
+
+  chrome.runtime.sendMessage({
+    type: 'LEETCODE_SUBMISSION',
+    data: { title, problemId, code, language }
+  }, response => {
+    if (chrome.runtime.lastError) {
+      console.error('Message error:', chrome.runtime.lastError.message);
+    } else {
+      console.log('Message sent successfully', response);
+    }
+  });
+}
+
+// Watch DOM for result changes
+const observer = new MutationObserver(() => {
+  extractAndSend();
 });
 
 observer.observe(document.body, { childList: true, subtree: true });
-console.log('LeetCode Sync content script loaded.');
+
+// Also try once after page load (for cases where result is already on page)
+setTimeout(extractAndSend, 2000);

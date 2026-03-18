@@ -15,21 +15,23 @@ Return JSON ONLY:
 }
 `;
 
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+  const res = await fetch(url, {
     method: "POST",
     headers: {
-      "Authorization": `Bearer ${apiKey}`,
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
-      model: "gpt-4o-mini",
-      messages: [{ role: "user", content: prompt }]
+      contents: [{
+        parts: [{ text: prompt }]
+      }]
     })
   });
 
   const data = await res.json();
-  let content = data.choices[0].message.content;
-  
+  let content = data.candidates[0].content.parts[0].text;
+
   // Cleanup markdown if present
   content = content.replace(/```json\n|```/g, '').trim();
 
