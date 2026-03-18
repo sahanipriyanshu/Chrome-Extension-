@@ -75,14 +75,17 @@ function getCode() {
 }
 
 function extractAndSend() {
-  // Check for accepted result — try known selectors first
+  // Try all known selectors for the Accepted result
   let resultEl =
     document.querySelector('[data-e2e-locator="submission-result"]') ||
-    document.querySelector('[data-cy="submission-result"]');
+    document.querySelector('[data-cy="submission-result"]') ||
+    document.querySelector('[data-e2e-locator="result-state"]') ||
+    document.querySelector('.text-green-s') ||   // LeetCode green text class
+    document.querySelector('[class*="result-state"]');
 
-  // Fallback: find any element whose VISIBLE text is exactly "Accepted"
+  // Broad fallback: any leaf element containing exactly "Accepted"
   if (!resultEl) {
-    resultEl = Array.from(document.querySelectorAll('span, div, p')).find(
+    resultEl = Array.from(document.querySelectorAll('span, div, p, h4, h5')).find(
       el => el.children.length === 0 && el.innerText?.trim() === 'Accepted'
     );
   }
