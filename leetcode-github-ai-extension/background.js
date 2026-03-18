@@ -22,7 +22,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   const problem = message.data;
   console.log('📨 Received submission for:', problem.title);
 
-  // Must return true to keep the message channel open for async response
   (async () => {
     try {
       const settings = await chrome.storage.local.get([
@@ -45,20 +44,26 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return;
       }
 
-      // 1. Generate AI Explanation (requires Gemini API key)
+      // 1. Try AI generation (optional — won't block save/push if it fails)
+      let aiResponse = { explanation: 'No AI explanation (API key missing or invalid).', commit: `Add ${problem.title}` };
       const apiKey = settings[OPENAI_API_KEY];
-      if (!apiKey) {
-        throw new Error('Gemini API Key is missing. Configure it in the dashboard.');
+      if (apiKey) {
+        try {
+          console.log('🤖 Generating AI breakdown...');
+          aiResponse = await generateAI(problem, apiKey);
+        } catch (aiErr) {
+          console.warn('⚠️ AI generation failed (skipping):', aiErr.message);
+          aiResponse.explanation = `AI unavailable: ${aiErr.message}`;
+        }
+      } else {
+        console.warn('⚠️ No Gemini API key set — saving without AI explanation.');
       }
 
-      console.log('🤖 Generating AI breakdown...');
-      const aiResponse = await generateAI(problem, apiKey);
-
-      // 2. Save locally
+      // 2. Always save locally
       console.log('💾 Saving to local history...');
       await saveProblem(problem, aiResponse);
 
-      // 3. Push to GitHub
+      // 3. Push to GitHub if credentials are configured
       const token = settings[GITHUB_TOKEN_KEY];
       const repo = settings[GITHUB_REPO_KEY];
 
@@ -76,7 +81,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ ok: true });
       } else {
         console.warn('⚠️ GitHub token/repo missing. Saved locally only.');
-        sendResponse({ ok: false, reason: 'missing token or repo' });
+        sendResponse({ ok: false, reason: 'missing token or repo — saved locally only' });
       }
     } catch (error) {
       console.error('❌ Sync failed:', error);

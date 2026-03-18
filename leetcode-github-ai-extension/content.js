@@ -112,6 +112,15 @@ function extractAndSend() {
   console.log('✅ Accepted submission detected:', title);
   console.log('Code length:', code.length);
 
+  // If Monaco hasn't rendered yet, retry after a short delay
+  if (!code || code.trim().length === 0) {
+    console.warn('⚠️ Code is empty — Monaco editor not ready yet. Retrying in 1.5s...');
+    // Reset the dedup key so the retry can proceed
+    sessionStorage.removeItem(dedupKey);
+    setTimeout(extractAndSend, 1500);
+    return;
+  }
+
   showToast('⏳ Pushing to GitHub...', '#4f46e5');
 
   try {

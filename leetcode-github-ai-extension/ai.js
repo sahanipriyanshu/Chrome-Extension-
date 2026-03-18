@@ -36,10 +36,19 @@ Return JSON ONLY:
     throw new Error(errMsg);
   }
 
-  let content = data.candidates[0].content.parts[0].text;
+  const candidate = data.candidates[0];
+  const rawText = candidate?.content?.parts?.[0]?.text;
+  if (!rawText) {
+    const reason = candidate?.finishReason || 'unknown';
+    throw new Error(`Gemini returned empty response (finishReason: ${reason}). Check your API key or try again.`);
+  }
 
   // Cleanup markdown if present
-  content = content.replace(/```json\n|```/g, '').trim();
+  let content = rawText.replace(/```json\n?|```/g, '').trim();
 
-  return JSON.parse(content);
+  try {
+    return JSON.parse(content);
+  } catch {
+    throw new Error('Gemini response was not valid JSON. Raw: ' + content.slice(0, 200));
+  }
 }
