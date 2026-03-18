@@ -3,6 +3,42 @@ console.log('LeetCode Sync content script loaded on:', window.location.href);
 let lastSubmittedId = null; // Prevent duplicate sends
 let lastSubmitTime = 0;   // Timestamp guard (5s cooldown)
 
+function showToast(message, bgColor = '#16a34a') {
+  // Remove any existing toast
+  const existing = document.getElementById('lc-sync-toast');
+  if (existing) existing.remove();
+
+  const toast = document.createElement('div');
+  toast.id = 'lc-sync-toast';
+  toast.innerText = message;
+  Object.assign(toast.style, {
+    position: 'fixed',
+    top: '80px',
+    right: '24px',
+    zIndex: '999999',
+    background: bgColor,
+    color: '#fff',
+    padding: '14px 20px',
+    borderRadius: '10px',
+    fontSize: '15px',
+    fontWeight: '600',
+    boxShadow: '0 4px 20px rgba(0,0,0,0.35)',
+    transition: 'opacity 0.5s ease',
+    opacity: '1',
+    maxWidth: '340px',
+    lineHeight: '1.4'
+  });
+  document.body.appendChild(toast);
+
+  // Auto-dismiss after 5 seconds
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    setTimeout(() => toast.remove(), 500);
+  }, 5000);
+}
+
+
+
 function getLanguage() {
   // Try multiple selectors LeetCode uses for the language picker
   const sel =
@@ -72,14 +108,19 @@ function extractAndSend() {
   console.log('✅ Accepted submission detected:', title);
   console.log('Code length:', code.length);
 
+  showToast('⏳ Pushing to GitHub...', '#4f46e5');
+
   chrome.runtime.sendMessage({
     type: 'LEETCODE_SUBMISSION',
     data: { title, problemId, code, language }
   }, response => {
     if (chrome.runtime.lastError) {
       console.error('Message error:', chrome.runtime.lastError.message);
+      showToast('❌ Error: ' + chrome.runtime.lastError.message, '#dc2626');
+    } else if (response?.ok) {
+      showToast(`✅ "${title}" pushed to GitHub!`, '#16a34a');
     } else {
-      console.log('Message sent successfully', response);
+      showToast('⚠️ ' + (response?.reason || response?.error || 'Sync failed'), '#d97706');
     }
   });
 }
