@@ -1,10 +1,7 @@
 console.log('LeetCode Sync content script loaded on:', window.location.href);
 
-let lastSubmittedId = null; // Prevent duplicate sends
-let lastSubmitTime = 0;   // Timestamp guard (5s cooldown)
-
+// ─── Toast Notification ──────────────────────────────────────────────────────
 function showToast(message, bgColor = '#16a34a') {
-  // Remove any existing toast
   const existing = document.getElementById('lc-sync-toast');
   if (existing) existing.remove();
 
@@ -30,17 +27,14 @@ function showToast(message, bgColor = '#16a34a') {
   });
   document.body.appendChild(toast);
 
-  // Auto-dismiss after 5 seconds
   setTimeout(() => {
     toast.style.opacity = '0';
     setTimeout(() => toast.remove(), 500);
   }, 5000);
 }
 
-
-
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 function getLanguage() {
-  // Try multiple selectors LeetCode uses for the language picker
   const sel =
     document.querySelector('[data-cy="lang-select"] .ant-select-selection-item')?.innerText ||
     document.querySelector('.ant-select-selection-item')?.innerText ||
@@ -50,7 +44,6 @@ function getLanguage() {
 }
 
 function getProblemTitle() {
-  // Try multiple title selectors
   return (
     document.querySelector('a[href*="/problems/"] .mr-2')?.innerText ||
     document.querySelector('div[data-cy="question-title"]')?.innerText ||
@@ -63,95 +56,134 @@ function getProblemTitle() {
 }
 
 function getCode() {
-  // Get visible code from Monaco editor lines
   const lines = Array.from(document.querySelectorAll('.view-lines .view-line'));
-  if (lines.length > 0) {
-    return lines.map(l => l.innerText).join('\n');
-  }
-  // Fallback: CodeMirror
+  if (lines.length > 0) return lines.map(l => l.innerText).join('\n');
   const cm = document.querySelector('.CodeMirror');
   if (cm && cm.CodeMirror) return cm.CodeMirror.getValue();
   return '';
 }
 
-function extractAndSend() {
-  // Try all known selectors for the Accepted result
-  let resultEl =
-    document.querySelector('[data-e2e-locator="submission-result"]') ||
-    document.querySelector('[data-cy="submission-result"]') ||
-    document.querySelector('[data-e2e-locator="result-state"]') ||
-    document.querySelector('.text-green-s') ||   // LeetCode green text class
-    document.querySelector('[class*="result-state"]');
+// ─── Check if an element is the Submit button ─────────────────────────────────
+function isSubmitButton(el) {
+  if (!el) return false;
+  const text = el.innerText?.trim().toLowerCase() || '';
+  const testId = el.getAttribute('data-e2e-locator') || '';
+  return (
+    testId === 'console-submit-button' ||
+    text === 'submit' ||
+    (el.tagName === 'BUTTON' && text.includes('submit') && !text.includes('test'))
+  );
+}
 
-  // Broad fallback: any leaf element containing exactly "Accepted"
-  if (!resultEl) {
-    resultEl = Array.from(document.querySelectorAll('span, div, p, h4, h5')).find(
-      el => el.children.length === 0 && el.innerText?.trim() === 'Accepted'
-    );
-  }
+// ─── Poll for the submission result after clicking Submit ─────────────────────
+function pollForResult(title, maxAttempts = 30, intervalMs = 1500) {
+  let attempts = 0;
 
-  if (!resultEl) return;
+  const interval = setInterval(() => {
+    attempts++;
 
-  const resultText = resultEl.innerText?.trim() || '';
-  if (!resultText.includes('Accepted')) return;
+    // Look for the result element
+    let resultEl =
+      document.querySelector('[data-e2e-locator="submission-result"]') ||
+      document.querySelector('[data-cy="submission-result"]') ||
+      document.querySelector('[data-e2e-locator="result-state"]') ||
+      document.querySelector('[class*="result-state"]');
 
-  // Dedup: store last push TIME per problem title in sessionStorage
-  // This survives extension reloads and LeetCode SPA URL changes
-  const title = getProblemTitle();
-  const dedupKey = 'lc_push_' + title.replace(/\s+/g, '_');
-  const lastPush = parseInt(sessionStorage.getItem(dedupKey) || '0', 10);
-  const now = Date.now();
-  if (now - lastPush < 60000) return;  // block same problem within 60s
-  sessionStorage.setItem(dedupKey, String(now));
-  lastSubmitTime = now;
+    // Broad fallback: leaf element with exactly "Accepted" or "Wrong Answer" etc.
+    if (!resultEl) {
+      resultEl = Array.from(document.querySelectorAll('span, div, p, h4, h5')).find(
+        el => el.children.length === 0 && /^(Accepted|Wrong Answer|Time Limit Exceeded|Runtime Error|Compile Error|Memory Limit Exceeded)$/i.test(el.innerText?.trim())
+      );
+    }
 
+    if (resultEl) {
+      const resultText = resultEl.innerText?.trim() || '';
+      clearInterval(interval);
+
+      if (resultText.toLowerCase() === 'accepted') {
+        console.log('✅ Accepted! Pushing to GitHub...');
+        sendToBackground(title);
+      } else {
+        console.log(`ℹ️ Result: "${resultText}" — not pushing.`);
+        // No toast for wrong answers — keep it quiet
+      }
+      return;
+    }
+
+    if (attempts >= maxAttempts) {
+      clearInterval(interval);
+      console.warn('⚠️ Result not found after polling. Giving up.');
+    }
+  }, intervalMs);
+}
+
+// ─── Send accepted submission to background ────────────────────────────────────
+function sendToBackground(title) {
   const code = getCode();
   const language = getLanguage();
   const problemId = window.location.pathname.split('/')[2];
 
-  console.log('✅ Accepted submission detected:', title);
-  console.log('Code length:', code.length);
-
-  // If Monaco hasn't rendered yet, retry after a short delay
+  // If Monaco hasn't rendered yet, retry once
   if (!code || code.trim().length === 0) {
-    console.warn('⚠️ Code is empty — Monaco editor not ready yet. Retrying in 1.5s...');
-    // Reset the dedup key so the retry can proceed
-    sessionStorage.removeItem(dedupKey);
-    setTimeout(extractAndSend, 1500);
+    console.warn('⚠️ Code empty — Monaco not ready. Retrying in 1.5s...');
+    setTimeout(() => sendToBackground(title), 1500);
     return;
   }
 
+  console.log('📤 Sending submission:', title, '| Lang:', language, '| Code length:', code.length);
   showToast('⏳ Pushing to GitHub...', '#4f46e5');
 
   try {
-    chrome.runtime.sendMessage({
-      type: 'LEETCODE_SUBMISSION',
-      data: { title, problemId, code, language }
-    }, response => {
-      if (chrome.runtime.lastError) {
-        const msg = chrome.runtime.lastError.message || '';
-        if (msg.includes('invalidated') || msg.includes('context')) {
-          showToast('🔄 Extension updated — please refresh this page!', '#d97706');
+    chrome.runtime.sendMessage(
+      { type: 'LEETCODE_SUBMISSION', data: { title, problemId, code, language } },
+      response => {
+        if (chrome.runtime.lastError) {
+          const msg = chrome.runtime.lastError.message || '';
+          if (msg.includes('invalidated') || msg.includes('context')) {
+            showToast('🔄 Extension updated — please refresh this page!', '#d97706');
+          } else {
+            showToast('❌ Error: ' + msg, '#dc2626');
+          }
+        } else if (response?.ok) {
+          showToast(`✅ "${title}" pushed to GitHub!`, '#16a34a');
         } else {
-          showToast('❌ Error: ' + msg, '#dc2626');
+          showToast('⚠️ ' + (response?.reason || response?.error || 'Sync failed'), '#d97706');
         }
-      } else if (response?.ok) {
-        showToast(`✅ "${title}" pushed to GitHub!`, '#16a34a');
-      } else {
-        showToast('⚠️ ' + (response?.reason || response?.error || 'Sync failed'), '#d97706');
       }
-    });
+    );
   } catch (e) {
     showToast('🔄 Extension updated — please refresh this page!', '#d97706');
   }
 }
 
-// Watch DOM for result changes
-const observer = new MutationObserver(() => {
-  extractAndSend();
-});
+// ─── Attach Submit Button Listener via Delegation ─────────────────────────────
+// We use event delegation on the document so it works even after LeetCode's
+// React re-renders (which replaces DOM nodes).
+let isPolling = false;  // prevent overlapping polls from double-clicks
 
-observer.observe(document.body, { childList: true, subtree: true });
+document.addEventListener('click', event => {
+  // Walk up the tree in case the click landed on a child element of the button
+  let target = event.target;
+  for (let i = 0; i < 5 && target; i++) {
+    if (target.tagName === 'BUTTON' && isSubmitButton(target)) {
+      if (isPolling) return; // already waiting for a result
+      isPolling = true;
 
-// Also try once after page load (for cases where result is already on page)
-setTimeout(extractAndSend, 2000);
+      const title = getProblemTitle();
+      console.log('🖱️ Submit button clicked for:', title);
+      showToast('⏳ Waiting for result...', '#6366f1');
+
+      // Give LeetCode a moment to kick off its own API call, then start polling
+      setTimeout(() => {
+        pollForResult(title, 30, 1500);
+        // Release the polling lock after max wait time (30 × 1.5s = 45s)
+        setTimeout(() => { isPolling = false; }, 45000);
+      }, 1000);
+
+      return; // no need to keep walking tree
+    }
+    target = target.parentElement;
+  }
+}, true); // capture phase so we see it before React
+
+console.log('✅ Submit-button click listener registered.');
