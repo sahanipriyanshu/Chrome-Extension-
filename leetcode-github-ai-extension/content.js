@@ -95,13 +95,14 @@ function extractAndSend() {
   const resultText = resultEl.innerText?.trim() || '';
   if (!resultText.includes('Accepted')) return;
 
-  // Dedup: 5-second cooldown to avoid double-firing on DOM re-renders
+  // Dedup: use sessionStorage so it survives extension reloads on the same tab
+  const submissionKey = window.location.pathname + '_' + resultText;
+  if (sessionStorage.getItem('lc_last_submit') === submissionKey) return;
+  sessionStorage.setItem('lc_last_submit', submissionKey);
+  // Also enforce a 5s in-memory guard
   const now = Date.now();
   if (now - lastSubmitTime < 5000) return;
   lastSubmitTime = now;
-
-  const submissionKey = window.location.pathname + '@' + now;
-  lastSubmittedId = submissionKey;
 
   const title = getProblemTitle();
   const code = getCode();
@@ -113,19 +114,27 @@ function extractAndSend() {
 
   showToast('⏳ Pushing to GitHub...', '#4f46e5');
 
-  chrome.runtime.sendMessage({
-    type: 'LEETCODE_SUBMISSION',
-    data: { title, problemId, code, language }
-  }, response => {
-    if (chrome.runtime.lastError) {
-      console.error('Message error:', chrome.runtime.lastError.message);
-      showToast('❌ Error: ' + chrome.runtime.lastError.message, '#dc2626');
-    } else if (response?.ok) {
-      showToast(`✅ "${title}" pushed to GitHub!`, '#16a34a');
-    } else {
-      showToast('⚠️ ' + (response?.reason || response?.error || 'Sync failed'), '#d97706');
-    }
-  });
+  try {
+    chrome.runtime.sendMessage({
+      type: 'LEETCODE_SUBMISSION',
+      data: { title, problemId, code, language }
+    }, response => {
+      if (chrome.runtime.lastError) {
+        const msg = chrome.runtime.lastError.message || '';
+        if (msg.includes('invalidated') || msg.includes('context')) {
+          showToast('🔄 Extension updated — please refresh this page!', '#d97706');
+        } else {
+          showToast('❌ Error: ' + msg, '#dc2626');
+        }
+      } else if (response?.ok) {
+        showToast(`✅ "${title}" pushed to GitHub!`, '#16a34a');
+      } else {
+        showToast('⚠️ ' + (response?.reason || response?.error || 'Sync failed'), '#d97706');
+      }
+    });
+  } catch (e) {
+    showToast('🔄 Extension updated — please refresh this page!', '#d97706');
+  }
 }
 
 // Watch DOM for result changes
